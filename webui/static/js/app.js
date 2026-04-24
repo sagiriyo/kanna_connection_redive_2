@@ -539,7 +539,7 @@
           var statusText = m.active ? "运行中" : "已停止";
           var cancelBtn = m.active
             ? '<button class="btn btn-sm btn-danger btn-cancel-monitor" data-gid="' + m.group_id + '">取消监控</button>'
-            : '';
+            : '<button class="btn btn-sm btn-danger btn-delete-monitor" data-gid="' + m.group_id + '">删除</button>';
           var accountInfo = m.account_name ? (' · 账号: ' + m.account_name) : '';
           return '<div class="monitor-item">' +
             '<div class="monitor-item-info">' +
@@ -555,6 +555,11 @@
         $$(".btn-cancel-monitor", monitorList).forEach(function (btn) {
           btn.addEventListener("click", function () {
             cancelMonitor(parseInt(this.dataset.gid), this);
+          });
+        });
+        $$(".btn-delete-monitor", monitorList).forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            deleteMonitor(parseInt(this.dataset.gid));
           });
         });
       } else {
@@ -747,6 +752,20 @@
         body: JSON.stringify({ group_id: groupId }),
       });
       toast("已取消出刀监控", "success");
+      loadSettings();
+    } catch (err) {
+      toast(err.message, "error");
+    }
+  }
+
+  async function deleteMonitor(groupId) {
+    if (!confirm("确认删除群 " + groupId + " 的监控记录？")) return;
+    try {
+      await api("/delete_monitor", {
+        method: "POST",
+        body: JSON.stringify({ group_id: groupId }),
+      });
+      toast("已删除监控记录", "success");
       loadSettings();
     } catch (err) {
       toast(err.message, "error");

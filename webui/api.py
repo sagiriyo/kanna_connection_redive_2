@@ -599,6 +599,27 @@ async def cancel_monitor(
     return "已取消出刀监控"
 
 
+@app.post("/delete_monitor")
+async def delete_monitor(
+    form: CancelMonitorForm, token: CookieCache = Depends(verify_cookie)
+):
+    user_id = int(token.user_id)
+    group_id = form.group_id
+    if group_id not in clanbattle_info:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "该群无监控记录")
+    clan_info = clanbattle_info[group_id]
+    # 只能删除已停止的监控
+    if clan_info.loop_check:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "监控仍在运行中，请先取消监控")
+    # 权限校验
+    if user_id != clan_info.user_id:
+        web_user = await pcr_sqla.web_query_user(user_id)
+        if not web_user or web_user.priority < 1:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "你不是监控人或管理员")
+    del clanbattle_info[group_id]
+    return "已删除监控记录"
+
+
 @app.post("/start_monitor")
 async def start_monitor(
     form: StartMonitorForm, token: CookieCache = Depends(verify_cookie)
