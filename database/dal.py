@@ -73,10 +73,23 @@ class SQALA:
     async def add_account(self, user_id: int, account: dict):
         async with self.async_session() as session:
             async with session.begin():
-                if await self.query_account(user_id):
+                viewer_id = account.get("viewer_id")
+                existing = None
+                if viewer_id:
+                    result = await session.execute(
+                        select(Account).where(
+                            Account.user_id == user_id,
+                            Account.viewer_id == viewer_id,
+                        )
+                    )
+                    existing = result.scalars().first()
+                if existing:
                     await session.execute(
                         update(Account)
-                        .where(Account.user_id == user_id)
+                        .where(
+                            Account.user_id == user_id,
+                            Account.viewer_id == viewer_id,
+                        )
                         .values(**account)
                     )
                 else:
