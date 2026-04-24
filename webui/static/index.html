@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>环奈连结R — 会战管理</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚔️</text></svg>">
+</head>
+<body>
+  <div id="app">
+    <!-- ===== 登录页 ===== -->
+    <section id="page-login" class="page active">
+      <div class="login-wrapper">
+        <div class="login-card">
+          <div class="login-header">
+            <div class="login-logo">⚔️</div>
+            <h1>环奈连结R</h1>
+            <p class="login-subtitle">公会战管理系统</p>
+          </div>
+          <form id="login-form" autocomplete="off">
+            <div class="form-group">
+              <label for="login-account">账号</label>
+              <input type="text" id="login-account" placeholder="请输入QQ号" required>
+            </div>
+            <div class="form-group">
+              <label for="login-password">密码</label>
+              <input type="password" id="login-password" placeholder="请输入密码" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block" id="login-btn">登 录</button>
+          </form>
+          <p class="login-tip">提示：QQ私聊机器人发送「网页端登录」获取临时密码</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 主界面 ===== -->
+    <section id="page-main" class="page">
+      <!-- 侧边栏 -->
+      <nav id="sidebar">
+        <div class="sidebar-header">
+          <span class="sidebar-logo">⚔️</span>
+          <span class="sidebar-title">kanna_pcr</span>
+          <button id="sidebar-toggle" class="sidebar-toggle" title="收起">☰</button>
+        </div>
+        <div class="sidebar-user" id="sidebar-user-info">
+          <div class="user-avatar" id="user-avatar">栞</div>
+          <div class="user-meta">
+            <div class="user-name" id="user-name">加载中...</div>
+            <div class="user-role" id="user-role">成员</div>
+          </div>
+        </div>
+        <ul class="sidebar-nav">
+          <li class="nav-item active" data-page="home">
+            <span class="nav-icon">🏠</span>
+            <span class="nav-text">首页</span>
+          </li>
+          <li class="nav-item" data-page="dashboard">
+            <span class="nav-icon">📊</span>
+            <span class="nav-text">仪表盘</span>
+          </li>
+          <li class="nav-item" data-page="report">
+            <span class="nav-icon">📋</span>
+            <span class="nav-text">战报</span>
+          </li>
+          <li class="nav-item" data-page="notice">
+            <span class="nav-icon">🔔</span>
+            <span class="nav-text">通知</span>
+          </li>
+          <li class="nav-item" data-page="help">
+            <span class="nav-icon">❓</span>
+            <span class="nav-text">帮助</span>
+          </li>
+        </ul>
+        <div class="sidebar-footer">
+          <button id="btn-logout" class="btn-logout" title="退出登录">
+            <span class="nav-icon">🚪</span>
+            <span class="nav-text">退出登录</span>
+          </button>
+        </div>
+      </nav>
+
+      <!-- 主内容区 -->
+      <main id="content">
+        <!-- 首页 -->
+        <div id="view-home" class="view active">
+          <div class="page-header">
+            <h2>首页</h2>
+            <span class="header-desc">欢迎回来</span>
+          </div>
+          <div class="home-welcome">
+            <div class="welcome-card">
+              <div class="welcome-text">
+                <h3 id="welcome-name">加载中...</h3>
+                <p id="welcome-saying" class="saying"></p>
+              </div>
+            </div>
+          </div>
+          <div class="section-title">我的公会</div>
+          <div id="clan-list" class="clan-grid">
+            <div class="loading-placeholder">正在加载公会列表...</div>
+          </div>
+        </div>
+
+        <!-- 仪表盘 -->
+        <div id="view-dashboard" class="view">
+          <div class="page-header">
+            <h2 id="dashboard-clan-name">仪表盘</h2>
+            <div class="header-badges">
+              <span class="badge badge-info" id="dashboard-stage">--</span>
+              <span class="badge badge-warning" id="dashboard-rank">排名 --</span>
+              <span class="badge" id="dashboard-state">监控: --</span>
+            </div>
+          </div>
+
+          <!-- 出刀概览 -->
+          <div class="stats-row">
+            <div class="stat-card">
+              <div class="stat-value" id="stat-today-dao">0</div>
+              <div class="stat-label">今日出刀</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="stat-yesterday-dao">0</div>
+              <div class="stat-label">昨日出刀</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="stat-day-num">0</div>
+              <div class="stat-label">会战天数</div>
+            </div>
+          </div>
+
+          <!-- Boss 状态 -->
+          <div class="section-title">Boss 状态</div>
+          <div id="boss-grid" class="boss-grid">
+            <div class="loading-placeholder">正在加载 Boss 信息...</div>
+          </div>
+
+          <!-- 今日出刀统计 -->
+          <div class="section-title">今日出刀统计</div>
+          <div id="dao-report" class="dao-report-grid">
+            <div class="loading-placeholder">暂无数据</div>
+          </div>
+        </div>
+
+        <!-- 战报 -->
+        <div id="view-report" class="view">
+          <div class="page-header">
+            <h2>战报</h2>
+            <div class="tab-group">
+              <button class="tab-btn active" data-tab="tab-all">总战报</button>
+              <button class="tab-btn" data-tab="tab-me">我的战报</button>
+              <button class="tab-btn" data-tab="tab-detail">出刀详情</button>
+            </div>
+          </div>
+
+          <div id="tab-all" class="tab-panel active">
+            <div class="table-wrapper">
+              <table class="data-table" id="table-all">
+                <thead>
+                  <tr>
+                    <th>排名</th>
+                    <th>昵称</th>
+                    <th>出刀数</th>
+                    <th>总伤害</th>
+                    <th>总分数</th>
+                    <th>伤害占比</th>
+                    <th>分数占比</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div id="tab-me" class="tab-panel">
+            <div id="my-report-name" class="my-report-name"></div>
+            <div class="table-wrapper">
+              <table class="data-table" id="table-me">
+                <thead>
+                  <tr>
+                    <th>刀数</th>
+                    <th>类型</th>
+                    <th>Boss</th>
+                    <th>周目</th>
+                    <th>伤害</th>
+                    <th>分数</th>
+                    <th>时间</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div id="tab-detail" class="tab-panel">
+            <div class="table-wrapper">
+              <table class="data-table" id="table-detail">
+                <thead>
+                  <tr>
+                    <th>编号</th>
+                    <th>昵称</th>
+                    <th>类型</th>
+                    <th>Boss</th>
+                    <th>周目</th>
+                    <th>伤害</th>
+                    <th>分数</th>
+                    <th>时间</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- 通知 -->
+        <div id="view-notice" class="view">
+          <div class="page-header">
+            <h2>通知管理</h2>
+          </div>
+          <div class="notice-sections">
+            <div class="notice-section">
+              <div class="notice-section-header">
+                <h3>📌 预约列表</h3>
+                <button class="btn btn-sm btn-primary" id="btn-add-subscribe">+ 预约</button>
+              </div>
+              <div id="subscribe-list" class="notice-list">
+                <div class="empty-state">暂无预约</div>
+              </div>
+            </div>
+            <div class="notice-section">
+              <div class="notice-section-header">
+                <h3>⚔️ 申请出刀</h3>
+                <button class="btn btn-sm btn-primary" id="btn-add-apply">+ 申请</button>
+              </div>
+              <div id="apply-list" class="notice-list">
+                <div class="empty-state">暂无申请</div>
+              </div>
+            </div>
+            <div class="notice-section">
+              <div class="notice-section-header">
+                <h3>🌳 挂树列表</h3>
+                <button class="btn btn-sm btn-accent" id="btn-add-tree">+ 挂树</button>
+              </div>
+              <div id="tree-list" class="notice-list">
+                <div class="empty-state">暂无挂树</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 帮助 -->
+        <div id="view-help" class="view">
+          <div class="page-header">
+            <h2>帮助文档</h2>
+          </div>
+          <div class="help-content">
+            <div class="help-card">
+              <h3>📊 自动报刀</h3>
+              <div class="help-list">
+                <div class="help-item"><code>出刀监控</code><span>机器人登录账号，监视出刀情况并记录</span></div>
+                <div class="help-item"><code>催刀</code><span>查看谁没出满三刀</span></div>
+                <div class="help-item"><code>当前战报</code><span>本期会战出刀情况</span></div>
+                <div class="help-item"><code>我的战报 + 游戏名称</code><span>个人出刀情况</span></div>
+                <div class="help-item"><code>今日战报 / 昨日战报 + 游戏名称</code><span>今日/昨日个人出刀情况</span></div>
+                <div class="help-item"><code>出刀详情 + 出刀编号</code><span>查看某一刀怎么出的</span></div>
+                <div class="help-item"><code>今日出刀 / 昨日出刀</code><span>今日/昨日出刀情况</span></div>
+                <div class="help-item"><code>状态</code><span>查看当前进度</span></div>
+                <div class="help-item"><code>boss状态</code><span>查看boss里面有几个人</span></div>
+              </div>
+            </div>
+            <div class="help-card">
+              <h3>📌 预约 / 申请 / 挂树</h3>
+              <div class="help-list">
+                <div class="help-item"><code>预约 + 数字 + (周目) + (留言)</code><span>预约boss</span></div>
+                <div class="help-item"><code>取消预约 + (数字)</code><span>取消预约</span></div>
+                <div class="help-item"><code>预约表</code><span>查看预约情况</span></div>
+                <div class="help-item"><code>申请出刀 + 数字 + (留言)</code><span>申请打boss</span></div>
+                <div class="help-item"><code>取消申请</code><span>取消申请</span></div>
+                <div class="help-item"><code>挂树 + 数字</code><span>挂树</span></div>
+                <div class="help-item"><code>下树</code><span>取消挂树</span></div>
+                <div class="help-item"><code>查树</code><span>查看挂树情况</span></div>
+                <div class="help-item"><code>sl / sl?</code><span>记录/查看SL</span></div>
+              </div>
+            </div>
+            <div class="help-card">
+              <h3>🛡️ BOX / 助战查询</h3>
+              <div class="help-list">
+                <div class="help-item"><code>刷新box缓存</code><span>机器人自动上号记录BOX</span></div>
+                <div class="help-item"><code>box查询 + 角色名字</code><span>查询角色BOX</span></div>
+                <div class="help-item"><code>公会box查询 + 角色名字</code><span>查询公会成员BOX</span></div>
+                <div class="help-item"><code>刷新助战缓存</code><span>机器人自动上号记录公会助战</span></div>
+                <div class="help-item"><code>精确助战 + 角色名字</code><span>查询助战</span></div>
+                <div class="help-item"><code>上公会战支援 + 角色名字</code><span>换公会战助战</span></div>
+                <div class="help-item"><code>公会深域查询</code><span>查询公会成员深域进度</span></div>
+              </div>
+            </div>
+            <div class="help-card">
+              <h3>⚔️ 竞技场杀手</h3>
+              <div class="help-list">
+                <div class="help-item"><code>竞技场监控</code><span>监视排名变化，自动给出复仇阵容</span></div>
+                <div class="help-item"><code>竞技场杀手 + 开启/关闭 + 竞技场</code><span>开启/关闭提醒</span></div>
+                <div class="help-item"><code>竞技场清次数 + 数字</code><span>查询竞技场</span></div>
+                <div class="help-item"><code>竞技场排行榜 + 数字</code><span>查询排行榜</span></div>
+                <div class="help-item"><code>竞技场查防守 + 数字</code><span>查作业</span></div>
+              </div>
+            </div>
+            <div class="help-card">
+              <h3>👥 成员管理</h3>
+              <div class="help-list">
+                <div class="help-item"><code>绑定本群公会</code><span>将自己绑定在群</span></div>
+                <div class="help-item"><code>删除本群公会绑定</code><span>将自己踢出公会</span></div>
+                <div class="help-item"><code>账号权限变更 + 数字</code><span>0:本人 1:管理 2:任何人</span></div>
+                <div class="help-item"><code>网页端登录</code><span>获取网页端临时密码</span></div>
+              </div>
+            </div>
+            <div class="help-card">
+              <h3>🔧 管理指令</h3>
+              <div class="help-list">
+                <div class="help-item"><code>启用肃正协议</code><span>清空所有数据（危险！）</span></div>
+                <div class="help-item"><code>修正出刀 + 编号 + 类型</code><span>修正错误刀（完整刀/尾刀/补偿）</span></div>
+                <div class="help-item"><code>会战KPI</code><span>查看等效出刀数</span></div>
+                <div class="help-item"><code>清空预约/申请 + (数字)</code><span>管理清空预约/申请</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </section>
+  </div>
+
+  <!-- 模态框 -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal-card" id="modal-card">
+      <div class="modal-header">
+        <h3 id="modal-title">操作</h3>
+        <button class="modal-close" id="modal-close">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-footer" id="modal-footer"></div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -3,11 +3,14 @@ import json
 import secrets
 import threading
 import time
+from pathlib import Path
 from typing import Dict
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from ..util.tools import daoflag2str, anywhere_send
 
@@ -24,6 +27,11 @@ from nonebot import on_startup
 from sse_starlette.sse import EventSourceResponse
 
 app = FastAPI()
+
+# 静态文件服务
+_static_dir = Path(__file__).parent / "static"
+if _static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
 origins = [
     "http://localhost",
@@ -42,6 +50,22 @@ app.add_middleware(
 )
 
 app.mount(WebSetting.api_base.value, app)
+
+
+@app.get("/")
+async def serve_index():
+    index_path = _static_dir / "index.html"
+    if index_path.exists():
+        return FileResponse(str(index_path))
+    return {"message": "KCRR Web UI - API is running"}
+
+
+@app.get("/login")
+async def serve_login_page():
+    index_path = _static_dir / "index.html"
+    if index_path.exists():
+        return FileResponse(str(index_path))
+    return {"message": "KCRR Web UI - API is running"}
 
 update_time: Dict[str, Dict[str, int]] = {"report": {}, "notice": {}}
 report_time = update_time["report"]
