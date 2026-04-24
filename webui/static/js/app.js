@@ -45,6 +45,7 @@
   }
 
   function setAvatar(imgEl, textEl, qq, name) {
+    if (!imgEl || !textEl) return;
     var url = qqAvatarUrl(qq);
     imgEl.src = url;
     imgEl.alt = name || "";
@@ -787,34 +788,7 @@
       if (data && data.user_id) {
         currentUserId = data.user_id;
         showMain();
-
-        // Fill user info
-        $("#welcome-name").textContent = "你好，" + data.name;
-        $("#welcome-saying").textContent = data.saying;
-        $("#user-name").textContent = data.name;
-        var roleMap = { 0: "成员", 1: "管理员", 2: "超级管理" };
-        $("#user-role").textContent = roleMap[data.priority] || "成员";
-        $("#user-avatar").textContent = (data.name || "栞")[0];
-
-        var clanList = $("#clan-list");
-        if (data.clan && data.clan.length) {
-          clanList.innerHTML = data.clan.map(function (c) {
-            var gid = c.group_id || c;
-            return `<div class="clan-card" data-gid="${gid}">
-              <span class="clan-card-arrow">→</span>
-              <div class="clan-card-id">群号: ${gid}</div>
-              <div class="clan-card-name">公会 ${gid}</div>
-            </div>`;
-          }).join("");
-          $$(".clan-card").forEach(function (card) {
-            card.addEventListener("click", function () {
-              currentGroupId = parseInt(this.dataset.gid);
-              switchView("dashboard");
-            });
-          });
-        } else {
-          clanList.innerHTML = '<div class="empty-state">暂无绑定公会，请在QQ群内发送「绑定本群公会」</div>';
-        }
+        loadHome();
       }
     } catch {
       // Not logged in — show login page
