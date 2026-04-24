@@ -445,21 +445,29 @@ async def unbind_clan(
     return "解绑公会成功"
 
 
-async def _get_clan_info(acc: Account):
-    """尝试获取账号所在公会信息，失败返回 None"""
-    for attempt in range(2):
-        try:
-            client = await query(acc, is_force=True)
-            home = await client.home_index()
-            if home.user_clan and home.user_clan.clan_id:
-                return {
-                    "clan_name": home.user_clan.clan_name,
-                    "clan_id": home.user_clan.clan_id,
-                }
-            return None
-        except Exception as e:
-            log.warning(f"查询账号 {acc.viewer_id} 公会信息失败(第{attempt+1}次): {e}")
+# 公会信息缓存: viewer_id -> {"clan_name": ..., "clan_id": ...}
+_clan_cache: Dict[int, dict] = {}
+
+
+def _cache_clan_from_monitor(viewer_id: int):
+    """从 clanbattle_info 中查找该账号所在公会"""
+    for gid, info in clanbattle_info.items():
+        if hasattr(info, 'clan_name') and info.clan_name:
+            return {"clan_name": info.clan_name, "clan_id": getattr(info, 'clan_id', None)}
     return None
+
+
+async def _try_cache_clan(client, viewer_id: int):
+    """绑定成功后尝试获取并缓存公会信息"""
+    try:
+        home = await client.home_index()
+        if home.user_clan and home.user_clan.clan_id:
+            _clan_cache[viewer_id] = {
+                "clan_name": home.user_clan.clan_name,
+                "clan_id": home.user_clan.clan_id,
+            }
+    except Exception as e:
+        log.warning(f"缓存账号 {viewer_id} 公会信息失败: {e}")
 
 
 @app.get("/accounts")
@@ -478,10 +486,14 @@ async def list_accounts(token: CookieCache = Depends(verify_cookie)):
             "clan_name": None,
             "clan_id": None,
         }
-        clan = await _get_clan_info(acc)
+        # 优先从缓存获取公会信息
+        clan = _clan_cache.get(acc.viewer_id)
+        # 没有缓存则从监控信息中获取
+        if not clan:
+            clan = _cache_clan_from_monitor(acc.viewer_id)
         if clan:
-            item["clan_name"] = clan["clan_name"]
-            item["clan_id"] = clan["clan_id"]
+            item["clan_name"] = clan.get("clan_name")
+            item["clan_id"] = clan.get("clan_id")
         result.append(item)
     return result
 
@@ -512,6 +524,7 @@ async def bind_account(
                 account.name = load_index.user_info.user_name
                 await pcr_sqla.add_account(user_id, account.dict(exclude_none=True), multi=True)
                 await pcr_sqla.add_refresh(bili_account)
+                await _try_cache_clan(client, account.viewer_id)
                 return {
                     "message": "绑定成功",
                     "name": account.name,
@@ -536,6 +549,7 @@ async def bind_account(
                 account.viewer_id = load_index.user_info.viewer_id
                 account.name = load_index.user_info.user_name
                 await pcr_sqla.add_account(user_id, account.dict(exclude_none=True), multi=True)
+                await _try_cache_clan(client, account.viewer_id)
                 return {
                     "message": "绑定成功",
                     "name": account.name,
@@ -557,6 +571,7 @@ async def bind_account(
             if load_index := await check_client(client):
                 account.name = load_index.user_info.user_name
                 await pcr_sqla.add_account(user_id, account.dict(exclude_none=True), multi=True)
+                await _try_cache_clan(client, account.viewer_id)
                 return {
                     "message": "绑定成功",
                     "name": account.name,
@@ -597,6 +612,27 @@ async def cancel_monitor(
             raise HTTPException(status.HTTP_403_FORBIDDEN, "你不是监控人或管理员")
     clan_info.loop_num += 1
     return "已取消出刀监控"
+
+
+@app.post("/delete_monitor")
+async def delete_monitor(
+    form: CancelMonitorForm, token: CookieCache = Depends(verify_cookie)
+):
+    user_id = int(token.user_id)
+    group_id = form.group_id
+    if group_id not in clanbattle_info:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "该群无监控记录")
+    clan_info = clanbattle_info[group_id]
+    # 只能删除已停止的监控
+    if clan_info.loop_check:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "监控仍在运行中，请先取消监控")
+    # 权限校验
+    if user_id != clan_info.user_id:
+        web_user = await pcr_sqla.web_query_user(user_id)
+        if not web_user or web_user.priority < 1:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "你不是监控人或管理员")
+    del clanbattle_info[group_id]
+    return "已删除监控记录"
 
 
 @app.post("/start_monitor")
@@ -641,6 +677,12 @@ async def start_monitor(
         )
 
     loop_num = clan_info.loop_num
+    # 缓存公会信息
+    if account.viewer_id and hasattr(clan_info, 'clan_id'):
+        _clan_cache[account.viewer_id] = {
+            "clan_name": clan_info.clan_name,
+            "clan_id": clan_info.clan_id,
+        }
     await clanbattle_pool.add_task(
         PrioritizedQueryItem(data=ClanbattleItem(clan_info, loop_num))
     )
@@ -666,26 +708,49 @@ async def my_clans(token: CookieCache = Depends(verify_cookie)):
     clans = []
     seen_clan_ids = set()
     for acc in accounts:
-        try:
-            client = await query(acc, is_force=True)
-            home = await client.home_index()
-            if home.user_clan and home.user_clan.clan_id:
-                clan_id = home.user_clan.clan_id
-                if clan_id in seen_clan_ids:
-                    continue
-                seen_clan_ids.add(clan_id)
-                clans.append({
-                    "clan_id": clan_id,
-                    "clan_name": home.user_clan.clan_name or "未知公会",
-                    "member_count": home.user_clan.clan_member_count or 0,
-                    "account_name": acc.name or str(acc.viewer_id),
-                    "platform": acc.platform,
-                    "platform_name": platform_map.get(acc.platform, "未知"),
-                    "already_bound": clan_id in bound_groups,
-                })
-        except Exception as e:
-            log.warning(f"查询账号 {acc.viewer_id} 公会信息失败: {e}")
-            continue
+        clan_id = None
+        clan_name = None
+        member_count = 0
+        # 优先从缓存获取
+        cached = _clan_cache.get(acc.viewer_id)
+        if cached and cached.get("clan_id"):
+            clan_id = cached["clan_id"]
+            clan_name = cached.get("clan_name", "未知公会")
+        # 再从监控信息获取
+        if not clan_id:
+            monitor = _cache_clan_from_monitor(acc.viewer_id)
+            if monitor and monitor.get("clan_id"):
+                clan_id = monitor["clan_id"]
+                clan_name = monitor.get("clan_name", "未知公会")
+        # 最后尝试实时查询
+        if not clan_id:
+            try:
+                client = await query(acc, is_force=True)
+                home = await client.home_index()
+                if home.user_clan and home.user_clan.clan_id:
+                    clan_id = home.user_clan.clan_id
+                    clan_name = home.user_clan.clan_name or "未知公会"
+                    member_count = home.user_clan.clan_member_count or 0
+                    _clan_cache[acc.viewer_id] = {
+                        "clan_name": clan_name,
+                        "clan_id": clan_id,
+                    }
+            except Exception as e:
+                log.warning(f"查询账号 {acc.viewer_id} 公会信息失败: {e}")
+                continue
+        if clan_id:
+            if clan_id in seen_clan_ids:
+                continue
+            seen_clan_ids.add(clan_id)
+            clans.append({
+                "clan_id": clan_id,
+                "clan_name": clan_name or "未知公会",
+                "member_count": member_count,
+                "account_name": acc.name or str(acc.viewer_id),
+                "platform": acc.platform,
+                "platform_name": platform_map.get(acc.platform, "未知"),
+                "already_bound": clan_id in bound_groups,
+            })
     return clans
 
 
