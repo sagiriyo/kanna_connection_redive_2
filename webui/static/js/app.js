@@ -681,16 +681,23 @@
           toast("请输入short_udid、udid和viewer_id", "error"); return;
         }
       }
+      // Show loading state
+      var confirmBtn = $("#modal-footer .btn-primary");
+      var cancelBtn = $("#modal-footer .btn-ghost");
+      var origText = confirmBtn ? confirmBtn.textContent : "";
+      if (confirmBtn) {
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = "正在登录验证中...";
+        confirmBtn.style.opacity = "0.6";
+        confirmBtn.style.cursor = "not-allowed";
+      }
+      if (cancelBtn) { cancelBtn.disabled = true; cancelBtn.style.opacity = "0.6"; }
       try {
         var res = await api("/bind_account", {
           method: "POST",
           body: JSON.stringify(payload),
         });
         closeModal();
-        var info = [];
-        if (res && res.viewer_id) info.push("UID: " + res.viewer_id);
-        if (res && res.name) info.push("昵称: " + res.name);
-        var detail = info.length ? "\n" + info.join("  |  ") : "";
         showModal("✅ 绑定成功", '\
           <div style="text-align:center;padding:1rem 0">\
             <div style="font-size:2.5rem;margin-bottom:.75rem">🎉</div>\
