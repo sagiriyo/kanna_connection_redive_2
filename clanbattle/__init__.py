@@ -59,6 +59,7 @@ help_text = """
 【kpi调整 + 游戏id + 补正】给某个玩家额外的kpi点数，可正可负
 【清空kpi】删除所有kpi补正
 【删除kpi+ 游戏id】删除特定补正
+【网页端登录】将在网页端显示会战详情（请私聊bot发送）
 """.strip()
 
 clanbattle_info: Dict[int, ClanBattle] = {}
