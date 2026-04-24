@@ -14,7 +14,8 @@ from fastapi.staticfiles import StaticFiles
 
 from ..util.tools import daoflag2str, anywhere_send
 
-from ..clanbattle import clanbattle_info, notice_update_time
+from ..clanbattle import clanbattle_info, notice_update_time, clanbattle_pool
+from ..clanbattle.model import ClanBattle, ClanbattleItem, PrioritizedQueryItem
 from ..util.auto_boss import clan_boss_info
 from ..clanbattle.base import clanbattle_report
 from ..database.dal import CookieCache, SLDao, pcr_sqla
@@ -444,6 +445,23 @@ async def unbind_clan(
     return "解绑公会成功"
 
 
+async def _get_clan_info(acc: Account):
+    """尝试获取账号所在公会信息，失败返回 None"""
+    for attempt in range(2):
+        try:
+            client = await query(acc, is_force=True)
+            home = await client.home_index()
+            if home.user_clan and home.user_clan.clan_id:
+                return {
+                    "clan_name": home.user_clan.clan_name,
+                    "clan_id": home.user_clan.clan_id,
+                }
+            return None
+        except Exception as e:
+            log.warning(f"查询账号 {acc.viewer_id} 公会信息失败(第{attempt+1}次): {e}")
+    return None
+
+
 @app.get("/accounts")
 async def list_accounts(token: CookieCache = Depends(verify_cookie)):
     user_id = int(token.user_id)
@@ -460,14 +478,10 @@ async def list_accounts(token: CookieCache = Depends(verify_cookie)):
             "clan_name": None,
             "clan_id": None,
         }
-        try:
-            client = await query(acc)
-            home = await client.home_index()
-            if home.user_clan and home.user_clan.clan_id:
-                item["clan_name"] = home.user_clan.clan_name
-                item["clan_id"] = home.user_clan.clan_id
-        except Exception:
-            pass
+        clan = await _get_clan_info(acc)
+        if clan:
+            item["clan_name"] = clan["clan_name"]
+            item["clan_id"] = clan["clan_id"]
         result.append(item)
     return result
 
@@ -496,7 +510,7 @@ async def bind_account(
             if load_index := await check_client(client):
                 account.viewer_id = load_index.user_info.viewer_id
                 account.name = load_index.user_info.user_name
-                await pcr_sqla.add_account(user_id, account.dict(exclude_none=True))
+                await pcr_sqla.add_account(user_id, account.dict(exclude_none=True), multi=True)
                 await pcr_sqla.add_refresh(bili_account)
                 return {
                     "message": "绑定成功",
@@ -521,7 +535,7 @@ async def bind_account(
             if load_index := await check_client(client):
                 account.viewer_id = load_index.user_info.viewer_id
                 account.name = load_index.user_info.user_name
-                await pcr_sqla.add_account(user_id, account.dict(exclude_none=True))
+                await pcr_sqla.add_account(user_id, account.dict(exclude_none=True), multi=True)
                 return {
                     "message": "绑定成功",
                     "name": account.name,
@@ -542,7 +556,7 @@ async def bind_account(
             client = await query(account, True)
             if load_index := await check_client(client):
                 account.name = load_index.user_info.user_name
-                await pcr_sqla.add_account(user_id, account.dict(exclude_none=True))
+                await pcr_sqla.add_account(user_id, account.dict(exclude_none=True), multi=True)
                 return {
                     "message": "绑定成功",
                     "name": account.name,
@@ -585,6 +599,59 @@ async def cancel_monitor(
     return "已取消出刀监控"
 
 
+@app.post("/start_monitor")
+async def start_monitor(
+    form: StartMonitorForm, token: CookieCache = Depends(verify_cookie)
+):
+    user_id = int(token.user_id)
+    group_id = form.group_id
+
+    # 查找指定账号
+    accounts = await pcr_sqla.query_account(user_id)
+    account = None
+    for acc in accounts:
+        if acc.id == form.account_id:
+            account = acc
+            break
+    if not account:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "未找到该账号")
+
+    # 验证用户已绑定该公会
+    groups = await pcr_sqla.get_member_group(user_id)
+    if not groups or not any(g.group_id == group_id for g in groups):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "你未绑定该公会，请先绑定公会")
+
+    # 检查是否已在监控
+    if group_id in clanbattle_info and clanbattle_info[group_id].loop_check:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "该群已在监控中")
+
+    # 初始化监控
+    if group_id not in clanbattle_info:
+        clanbattle_info[group_id] = ClanBattle(group_id)
+    clan_info = clanbattle_info[group_id]
+
+    try:
+        client = await query(account, True)
+        await clan_info.init(client, user_id, None)
+    except Exception as e:
+        log.error(traceback.format_exc())
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"启动监控失败: {str(e)}"
+        )
+
+    loop_num = clan_info.loop_num
+    await clanbattle_pool.add_task(
+        PrioritizedQueryItem(data=ClanbattleItem(clan_info, loop_num))
+    )
+    return {
+        "message": "监控已启动",
+        "loop_num": loop_num,
+        "clan_name": clan_info.clan_name,
+        "rank": clan_info.rank,
+    }
+
+
 @app.get("/my_clans")
 async def my_clans(token: CookieCache = Depends(verify_cookie)):
     user_id = int(token.user_id)
@@ -600,7 +667,7 @@ async def my_clans(token: CookieCache = Depends(verify_cookie)):
     seen_clan_ids = set()
     for acc in accounts:
         try:
-            client = await query(acc)
+            client = await query(acc, is_force=True)
             home = await client.home_index()
             if home.user_clan and home.user_clan.clan_id:
                 clan_id = home.user_clan.clan_id
