@@ -505,11 +505,10 @@
   async function loadSettings() {
     try {
       var data = await api("/account_info");
-      var platformMap = { 2: "B服", 3: "渠道服", 4: "台服" };
       $("#settings-qq").textContent = data.user_id || "--";
-      $("#settings-name").textContent = data.name || "未绑定";
-      $("#settings-viewer-id").textContent = data.viewer_id || "未绑定";
-      $("#settings-platform").textContent = platformMap[data.platform] || "未绑定";
+
+      // Account list
+      loadAccountList();
 
       // Clan list
       var clanList = $("#settings-clan-list");
@@ -538,19 +537,125 @@
         monitorList.innerHTML = data.monitors.map(function (m) {
           var statusClass = m.active ? "active" : "inactive";
           var statusText = m.active ? "运行中" : "已停止";
+          var cancelBtn = m.active
+            ? '<button class="btn btn-sm btn-danger btn-cancel-monitor" data-gid="' + m.group_id + '">取消监控</button>'
+            : '<span class="monitor-status inactive">已停止</span>';
           return '<div class="monitor-item">' +
             '<div class="monitor-item-info">' +
               '<span class="monitor-item-name">' + (m.clan_name || "公会 " + m.group_id) + '</span>' +
               '<span class="monitor-item-detail">群号: ' + m.group_id + ' · 排名: ' + (m.rank || "--") + '</span>' +
             '</div>' +
-            '<span class="monitor-status ' + statusClass + '">' + statusText + '</span>' +
+            '<div class="monitor-item-actions">' +
+              '<span class="monitor-status ' + statusClass + '">' + statusText + '</span>' +
+              cancelBtn +
+            '</div>' +
           '</div>';
         }).join("");
+        $$(".btn-cancel-monitor", monitorList).forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            cancelMonitor(parseInt(this.dataset.gid));
+          });
+        });
       } else {
         monitorList.innerHTML = '<div class="empty-state">暂无监控记录</div>';
       }
     } catch (err) {
       toast("加载设置失败: " + err.message, "error");
+    }
+  }
+
+  async function loadAccountList() {
+    try {
+      var accounts = await api("/accounts");
+      var accountList = $("#settings-account-list");
+      if (accounts && accounts.length) {
+        accountList.innerHTML = accounts.map(function (acc) {
+          return '<div class="settings-account-item">' +
+            '<div class="settings-account-item-info">' +
+              '<span class="settings-account-item-name">' + (acc.name || "未设置昵称") + '</span>' +
+              '<span class="settings-account-item-detail">' +
+                '游戏ID: ' + (acc.viewer_id || "--") +
+                ' · 服务器: ' + (acc.platform_name || "未知") +
+              '</span>' +
+            '</div>' +
+            '<button class="btn btn-sm btn-danger btn-unbind-account" data-aid="' + acc.id + '" data-name="' + (acc.name || "该账号") + '">解绑</button>' +
+          '</div>';
+        }).join("");
+        $$(".btn-unbind-account", accountList).forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            unbindAccount(parseInt(this.dataset.aid), this.dataset.name);
+          });
+        });
+      } else {
+        accountList.innerHTML = '<div class="empty-state">暂无绑定账号，请点击下方按钮绑定</div>';
+      }
+    } catch (err) {
+      toast("加载账号列表失败: " + err.message, "error");
+    }
+  }
+
+  async function unbindAccount(accountId, name) {
+    if (!confirm('确认解绑账号「' + name + '」？解绑后相关数据不会删除。')) return;
+    try {
+      await api("/unbind_account", {
+        method: "POST",
+        body: JSON.stringify({ account_id: accountId }),
+      });
+      toast("解绑账号成功", "success");
+      loadAccountList();
+    } catch (err) {
+      toast(err.message, "error");
+    }
+  }
+
+  function showBindAccountModal() {
+    showModal("绑定游戏账号", '\
+      <div class="modal-form-group">\
+        <label>游戏ID (Viewer ID)</label>\
+        <input type="number" id="modal-account-vid" placeholder="输入游戏ID" required>\
+      </div>\
+      <div class="modal-form-group">\
+        <label>服务器</label>\
+        <select id="modal-account-platform">\
+          <option value="2">B服</option>\
+          <option value="3">渠道服</option>\
+          <option value="4">台服</option>\
+        </select>\
+      </div>\
+      <div class="modal-form-group">\
+        <label>游戏昵称 (可选)</label>\
+        <input type="text" id="modal-account-name" placeholder="输入游戏昵称">\
+      </div>\
+    ', async function () {
+      var vid = parseInt($("#modal-account-vid").value);
+      var platform = parseInt($("#modal-account-platform").value);
+      var name = $("#modal-account-name").value.trim();
+      if (!vid) { toast("请输入游戏ID", "error"); return; }
+      try {
+        await api("/bind_account", {
+          method: "POST",
+          body: JSON.stringify({ viewer_id: vid, platform: platform, name: name }),
+        });
+        toast("绑定账号成功", "success");
+        closeModal();
+        loadAccountList();
+      } catch (err) {
+        toast(err.message, "error");
+      }
+    });
+  }
+
+  async function cancelMonitor(groupId) {
+    if (!confirm("确认取消群 " + groupId + " 的出刀监控？")) return;
+    try {
+      await api("/cancel_monitor", {
+        method: "POST",
+        body: JSON.stringify({ group_id: groupId }),
+      });
+      toast("已取消出刀监控", "success");
+      loadSettings();
+    } catch (err) {
+      toast(err.message, "error");
     }
   }
 
@@ -728,7 +833,7 @@
     $$(".nav-item").forEach(function (item) {
       item.addEventListener("click", function () {
         var page = this.dataset.page;
-        if (page !== "home" && page !== "help" && page !== "settings" && !currentGroupId) {
+        if (page !== "home" && page !== "help" && page !== "settings" && page !== "password" && !currentGroupId) {
           toast("请先在首页选择一个公会", "info");
           return;
         }
@@ -777,6 +882,7 @@
     // Settings
     initChangePassword();
     $("#btn-bind-clan").addEventListener("click", showBindClanModal);
+    $("#btn-bind-account").addEventListener("click", showBindAccountModal);
 
     // Try auto-login (check if cookie is still valid)
     autoLogin();

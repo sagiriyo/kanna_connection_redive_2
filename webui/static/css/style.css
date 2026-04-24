@@ -805,6 +805,17 @@ a:hover { text-decoration: underline; }
 .settings-card-body .form-group { margin-bottom: 1rem; }
 .settings-card-body .form-group:last-of-type { margin-bottom: 1.25rem; }
 
+/* Password Page */
+.password-page {
+  display: flex;
+  justify-content: center;
+  padding-top: 2rem;
+}
+.password-card {
+  width: 100%;
+  max-width: 420px;
+}
+
 .info-row {
   display: flex;
   justify-content: space-between;
@@ -834,7 +845,23 @@ a:hover { text-decoration: underline; }
 }
 .settings-clan-item-name { font-weight: 500; font-size: .9rem; }
 .settings-clan-item-id { font-size: .8rem; color: var(--text-muted); }
-.settings-clan-actions { margin-top: .5rem; }
+.settings-clan-actions {
+  margin-top: .75rem;
+  display: flex;
+  justify-content: center;
+}
+.settings-clan-actions .btn {
+  width: 100%;
+  border: 2px dashed var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  transition: all .2s;
+}
+.settings-clan-actions .btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(99, 102, 241, .06);
+}
 
 .settings-monitor-list { margin-bottom: .75rem; }
 .monitor-item {
@@ -872,6 +899,33 @@ a:hover { text-decoration: underline; }
   border-radius: 50%;
   background: currentColor;
 }
+/* Account list */
+.settings-account-list { margin-bottom: 1rem; }
+.settings-account-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: .6rem .75rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: .5rem;
+}
+.settings-account-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+}
+.settings-account-item-name { font-weight: 500; font-size: .9rem; }
+.settings-account-item-detail { font-size: .8rem; color: var(--text-muted); }
+
+/* Monitor actions */
+.monitor-item-actions {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+
 .settings-hint {
   font-size: .8rem;
   color: var(--text-muted);

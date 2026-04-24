@@ -73,6 +73,10 @@
             <span class="nav-icon">🔔</span>
             <span class="nav-text">通知</span>
           </li>
+          <li class="nav-item" data-page="password">
+            <span class="nav-icon">🔑</span>
+            <span class="nav-text">修改密码</span>
+          </li>
           <li class="nav-item" data-page="settings">
             <span class="nav-icon">⚙️</span>
             <span class="nav-text">设置</span>
@@ -280,38 +284,21 @@
                   <span class="info-label">QQ号</span>
                   <span class="info-value" id="settings-qq">--</span>
                 </div>
-                <div class="info-row">
-                  <span class="info-label">游戏昵称</span>
-                  <span class="info-value" id="settings-name">--</span>
-                </div>
-                <div class="info-row">
-                  <span class="info-label">游戏ID</span>
-                  <span class="info-value" id="settings-viewer-id">--</span>
-                </div>
-                <div class="info-row">
-                  <span class="info-label">服务器</span>
-                  <span class="info-value" id="settings-platform">--</span>
-                </div>
               </div>
             </div>
 
-            <!-- 修改密码 -->
+            <!-- 绑定账号管理 -->
             <div class="settings-card">
               <div class="settings-card-header">
-                <h3>🔑 修改密码</h3>
+                <h3>🎮 绑定账号管理</h3>
               </div>
               <div class="settings-card-body">
-                <form id="change-password-form" autocomplete="off">
-                  <div class="form-group">
-                    <label for="new-password">新密码</label>
-                    <input type="password" id="new-password" placeholder="请输入新密码（至少4位）" required minlength="4">
-                  </div>
-                  <div class="form-group">
-                    <label for="confirm-password">确认密码</label>
-                    <input type="password" id="confirm-password" placeholder="再次输入新密码" required minlength="4">
-                  </div>
-                  <button type="submit" class="btn btn-primary btn-block">修改密码</button>
-                </form>
+                <div id="settings-account-list" class="settings-account-list">
+                  <div class="loading-placeholder">加载中...</div>
+                </div>
+                <div class="settings-clan-actions">
+                  <button class="btn btn-primary btn-sm" id="btn-bind-account">+ 绑定新账号</button>
+                </div>
               </div>
             </div>
 
@@ -339,7 +326,34 @@
                 <div id="settings-monitor-list" class="settings-monitor-list">
                   <div class="loading-placeholder">加载中...</div>
                 </div>
-                <p class="settings-hint">💡 出刀监控需要在QQ群内发送「出刀监控」指令开启</p>
+                <p class="settings-hint">💡 出刀监控需要在QQ群内发送「出刀监控」指令开启，网页端可以取消监控</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 修改密码 -->
+        <div id="view-password" class="view">
+          <div class="page-header">
+            <h2>修改密码</h2>
+          </div>
+          <div class="password-page">
+            <div class="settings-card password-card">
+              <div class="settings-card-header">
+                <h3>🔑 修改密码</h3>
+              </div>
+              <div class="settings-card-body">
+                <form id="change-password-form" autocomplete="off">
+                  <div class="form-group">
+                    <label for="new-password">新密码</label>
+                    <input type="password" id="new-password" placeholder="请输入新密码（至少4位）" required minlength="4">
+                  </div>
+                  <div class="form-group">
+                    <label for="confirm-password">确认密码</label>
+                    <input type="password" id="confirm-password" placeholder="再次输入新密码" required minlength="4">
+                  </div>
+                  <button type="submit" class="btn btn-primary btn-block">修改密码</button>
+                </form>
               </div>
             </div>
           </div>
