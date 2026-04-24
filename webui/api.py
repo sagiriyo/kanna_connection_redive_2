@@ -565,6 +565,33 @@ async def cancel_monitor(
     return "已取消出刀监控"
 
 
+@app.get("/my_clans")
+async def my_clans(token: CookieCache = Depends(verify_cookie)):
+    user_id = int(token.user_id)
+    accounts = await pcr_sqla.query_account(user_id)
+    if not accounts:
+        return []
+    platform_map = {0: "B服", 1: "渠道服", 2: "台服"}
+    clans = []
+    for acc in accounts:
+        try:
+            client = await query(acc)
+            home = await client.home_index()
+            if home.user_clan and home.user_clan.clan_id:
+                clans.append({
+                    "clan_id": home.user_clan.clan_id,
+                    "clan_name": home.user_clan.clan_name or "未知公会",
+                    "member_count": home.user_clan.clan_member_count or 0,
+                    "account_name": acc.name or str(acc.viewer_id),
+                    "platform": acc.platform,
+                    "platform_name": platform_map.get(acc.platform, "未知"),
+                })
+        except Exception as e:
+            log.warning(f"查询账号 {acc.viewer_id} 公会信息失败: {e}")
+            continue
+    return clans
+
+
 @on_startup
 async def kanna_web():
     web = threading.Thread(

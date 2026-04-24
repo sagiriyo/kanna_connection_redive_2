@@ -681,16 +681,23 @@
           toast("请输入short_udid、udid和viewer_id", "error"); return;
         }
       }
+      // Show loading state
+      var confirmBtn = $("#modal-footer .btn-primary");
+      var cancelBtn = $("#modal-footer .btn-ghost");
+      var origText = confirmBtn ? confirmBtn.textContent : "";
+      if (confirmBtn) {
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = "正在登录验证中...";
+        confirmBtn.style.opacity = "0.6";
+        confirmBtn.style.cursor = "not-allowed";
+      }
+      if (cancelBtn) { cancelBtn.disabled = true; cancelBtn.style.opacity = "0.6"; }
       try {
         var res = await api("/bind_account", {
           method: "POST",
           body: JSON.stringify(payload),
         });
         closeModal();
-        var info = [];
-        if (res && res.viewer_id) info.push("UID: " + res.viewer_id);
-        if (res && res.name) info.push("昵称: " + res.name);
-        var detail = info.length ? "\n" + info.join("  |  ") : "";
         showModal("✅ 绑定成功", '\
           <div style="text-align:center;padding:1rem 0">\
             <div style="font-size:2.5rem;margin-bottom:.75rem">🎉</div>\
@@ -757,18 +764,52 @@
 
   function showBindClanModal() {
     showModal("绑定公会", '\
-      <div class="modal-form-group">\
-        <label>群号</label>\
-        <input type="number" id="modal-clan-gid" placeholder="输入QQ群号" required>\
+      <div id="clan-modal-loading" style="text-align:center;padding:1.5rem 0;color:var(--text-muted)">\
+        <p>正在从游戏服务器查询公会信息...</p>\
       </div>\
-      <div class="modal-form-group">\
-        <label>公会名称 (可选)</label>\
-        <input type="text" id="modal-clan-name" placeholder="输入公会名称" value="公会">\
+      <div id="clan-modal-content" style="display:none">\
+        <div class="modal-form-group">\
+          <label>选择公会</label>\
+          <select id="modal-clan-select">\
+          </select>\
+        </div>\
+        <div class="modal-form-group">\
+          <label>群号</label>\
+          <input type="number" id="modal-clan-gid" placeholder="输入QQ群号" required>\
+        </div>\
+        <div class="modal-form-group">\
+          <label>公会名称 (可选，默认使用游戏内公会名)</label>\
+          <input type="text" id="modal-clan-name" placeholder="输入公会名称">\
+        </div>\
+      </div>\
+      <div id="clan-modal-empty" style="display:none;text-align:center;padding:1rem 0;color:var(--text-muted)">\
+        <p>未找到公会信息，请先绑定游戏账号并加入公会</p>\
+        <p style="margin-top:.5rem">或者手动输入：</p>\
+        <div class="modal-form-group" style="margin-top:.75rem;text-align:left">\
+          <label>群号</label>\
+          <input type="number" id="modal-clan-gid-manual" placeholder="输入QQ群号">\
+        </div>\
+        <div class="modal-form-group" style="text-align:left">\
+          <label>公会名称 (可选)</label>\
+          <input type="text" id="modal-clan-name-manual" placeholder="输入公会名称" value="公会">\
+        </div>\
       </div>\
     ', async function () {
-      var gid = parseInt($("#modal-clan-gid").value);
-      var name = $("#modal-clan-name").value.trim() || "公会";
+      var gid, name;
+      var emptyDiv = $("#clan-modal-empty");
+      if (emptyDiv && emptyDiv.style.display !== "none") {
+        gid = parseInt($("#modal-clan-gid-manual").value);
+        name = $("#modal-clan-name-manual").value.trim() || "公会";
+      } else {
+        gid = parseInt($("#modal-clan-gid").value);
+        name = $("#modal-clan-name").value.trim();
+        var sel = $("#modal-clan-select");
+        if (sel && sel.value && !name) {
+          name = sel.options[sel.selectedIndex].getAttribute("data-name") || "公会";
+        }
+      }
       if (!gid) { toast("请输入群号", "error"); return; }
+      if (!name) name = "公会";
       try {
         await api("/bind_clan", {
           method: "POST",
@@ -782,6 +823,53 @@
         toast(err.message, "error");
       }
     });
+
+    // Fetch clan list from accounts
+    (async function () {
+      try {
+        var clans = await api("/my_clans");
+        var loading = $("#clan-modal-loading");
+        var content = $("#clan-modal-content");
+        var empty = $("#clan-modal-empty");
+        if (!loading) return;
+        loading.style.display = "none";
+        if (clans && clans.length > 0) {
+          content.style.display = "block";
+          var sel = $("#modal-clan-select");
+          clans.forEach(function (c) {
+            var opt = document.createElement("option");
+            opt.value = c.clan_id;
+            opt.setAttribute("data-name", c.clan_name);
+            opt.textContent = c.clan_name + "（" + c.platform_name + " · " + c.account_name + " · " + c.member_count + "人）";
+            sel.appendChild(opt);
+          });
+          // Pre-fill clan name
+          if (clans[0]) {
+            $("#modal-clan-name").value = clans[0].clan_name;
+          }
+          sel.addEventListener("change", function () {
+            var idx = this.selectedIndex;
+            var opt = this.options[idx];
+            if (opt) {
+              $("#modal-clan-name").value = opt.getAttribute("data-name") || "";
+            }
+          });
+        } else {
+          empty.style.display = "block";
+        }
+      } catch (err) {
+        var loading = $("#clan-modal-loading");
+        if (loading) loading.innerHTML = '<p style="color:var(--danger)">查询失败: ' + (err.message || "未知错误") + '</p>\
+          <div class="modal-form-group" style="margin-top:.75rem;text-align:left">\
+            <label>群号</label>\
+            <input type="number" id="modal-clan-gid-manual" placeholder="输入QQ群号">\
+          </div>\
+          <div class="modal-form-group" style="text-align:left">\
+            <label>公会名称 (可选)</label>\
+            <input type="text" id="modal-clan-name-manual" placeholder="输入公会名称" value="公会">\
+          </div>';
+      }
+    })();
   }
 
   function initChangePassword() {
