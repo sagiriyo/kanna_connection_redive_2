@@ -845,7 +845,23 @@ a:hover { text-decoration: underline; }
 }
 .settings-clan-item-name { font-weight: 500; font-size: .9rem; }
 .settings-clan-item-id { font-size: .8rem; color: var(--text-muted); }
-.settings-clan-actions { margin-top: .5rem; }
+.settings-clan-actions {
+  margin-top: .75rem;
+  display: flex;
+  justify-content: center;
+}
+.settings-clan-actions .btn {
+  width: 100%;
+  border: 2px dashed var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  transition: all .2s;
+}
+.settings-clan-actions .btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(99, 102, 241, .06);
+}
 
 .settings-monitor-list { margin-bottom: .75rem; }
 .monitor-item {
