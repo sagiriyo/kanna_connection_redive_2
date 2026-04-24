@@ -753,6 +753,83 @@
     }
   }
 
+  function showStartMonitorModal() {
+    showModal("开启出刀监控", '\
+      <div id="monitor-modal-loading" style="text-align:center;padding:1.5rem 0;color:var(--text-muted)">\
+        <p>正在加载账号和公会信息...</p>\
+      </div>\
+      <div id="monitor-modal-content" style="display:none">\
+        <div class="modal-form-group">\
+          <label>选择账号</label>\
+          <select id="modal-monitor-account"></select>\
+        </div>\
+        <div class="modal-form-group">\
+          <label>选择公会（群号）</label>\
+          <select id="modal-monitor-group"></select>\
+        </div>\
+      </div>\
+      <div id="monitor-modal-empty" style="display:none;text-align:center;padding:1rem 0;color:var(--text-muted)">\
+        <p>请先绑定游戏账号和公会</p>\
+      </div>\
+    ', async function () {
+      var accountId = parseInt($("#modal-monitor-account").value);
+      var groupId = parseInt($("#modal-monitor-group").value);
+      if (!accountId || !groupId) { toast("请选择账号和公会", "error"); return; }
+      var confirmBtn = $("#modal-footer .btn-primary");
+      var cancelBtn = $("#modal-footer .btn-ghost");
+      if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = "正在启动监控..."; confirmBtn.style.opacity = "0.6"; }
+      if (cancelBtn) { cancelBtn.disabled = true; cancelBtn.style.opacity = "0.6"; }
+      try {
+        var res = await api("/start_monitor", {
+          method: "POST",
+          body: JSON.stringify({ group_id: groupId, account_id: accountId }),
+        });
+        closeModal();
+        toast("监控已启动：" + (res.clan_name || "") + " 排名:" + (res.rank || "--"), "success");
+        loadSettings();
+      } catch (err) {
+        toast(err.message, "error");
+        if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = "确认"; confirmBtn.style.opacity = "1"; }
+        if (cancelBtn) { cancelBtn.disabled = false; cancelBtn.style.opacity = "1"; }
+      }
+    });
+
+    // Load accounts and clans
+    (async function () {
+      try {
+        var accounts = await api("/accounts");
+        var data = await api("/account_info");
+        var loading = $("#monitor-modal-loading");
+        var content = $("#monitor-modal-content");
+        var empty = $("#monitor-modal-empty");
+        if (!loading) return;
+        loading.style.display = "none";
+        if (accounts && accounts.length && data.clans && data.clans.length) {
+          content.style.display = "block";
+          var accSel = $("#modal-monitor-account");
+          accounts.forEach(function (acc) {
+            var opt = document.createElement("option");
+            opt.value = acc.id;
+            opt.textContent = (acc.name || "未命名") + "（" + (acc.platform_name || "未知") + " · UID:" + (acc.viewer_id || "--") + "）";
+            accSel.appendChild(opt);
+          });
+          var grpSel = $("#modal-monitor-group");
+          data.clans.forEach(function (c) {
+            var opt = document.createElement("option");
+            opt.value = c.group_id;
+            opt.textContent = (c.group_name || "公会") + "（群号:" + c.group_id + "）";
+            grpSel.appendChild(opt);
+          });
+        } else {
+          empty.style.display = "block";
+        }
+      } catch (err) {
+        var loading = $("#monitor-modal-loading");
+        if (loading) loading.innerHTML = '<p style="color:var(--danger)">加载失败: ' + (err.message || "未知错误") + '</p>';
+      }
+    })();
+  }
+
   async function unbindClan(groupId) {
     if (!confirm("确认解绑公会 " + groupId + "？")) return;
     try {
@@ -1059,6 +1136,7 @@
     initChangePassword();
     $("#btn-bind-clan").addEventListener("click", showBindClanModal);
     $("#btn-bind-account").addEventListener("click", showBindAccountModal);
+    $("#btn-start-monitor").addEventListener("click", showStartMonitorModal);
 
     // Try auto-login (check if cookie is still valid)
     autoLogin();

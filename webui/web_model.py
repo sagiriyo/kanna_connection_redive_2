@@ -128,3 +128,8 @@ class UnbindAccountForm(BaseModel):
 
 class CancelMonitorForm(BaseModel):
     group_id: int
+
+
+class StartMonitorForm(BaseModel):
+    group_id: int
+    account_id: int

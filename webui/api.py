@@ -14,7 +14,8 @@ from fastapi.staticfiles import StaticFiles
 
 from ..util.tools import daoflag2str, anywhere_send
 
-from ..clanbattle import clanbattle_info, notice_update_time
+from ..clanbattle import clanbattle_info, notice_update_time, clanbattle_pool
+from ..clanbattle.model import ClanBattle, ClanbattleItem, PrioritizedQueryItem
 from ..util.auto_boss import clan_boss_info
 from ..clanbattle.base import clanbattle_report
 from ..database.dal import CookieCache, SLDao, pcr_sqla
@@ -596,6 +597,59 @@ async def cancel_monitor(
             raise HTTPException(status.HTTP_403_FORBIDDEN, "你不是监控人或管理员")
     clan_info.loop_num += 1
     return "已取消出刀监控"
+
+
+@app.post("/start_monitor")
+async def start_monitor(
+    form: StartMonitorForm, token: CookieCache = Depends(verify_cookie)
+):
+    user_id = int(token.user_id)
+    group_id = form.group_id
+
+    # 查找指定账号
+    accounts = await pcr_sqla.query_account(user_id)
+    account = None
+    for acc in accounts:
+        if acc.id == form.account_id:
+            account = acc
+            break
+    if not account:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "未找到该账号")
+
+    # 验证用户已绑定该公会
+    groups = await pcr_sqla.get_member_group(user_id)
+    if not groups or not any(g.group_id == group_id for g in groups):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "你未绑定该公会，请先绑定公会")
+
+    # 检查是否已在监控
+    if group_id in clanbattle_info and clanbattle_info[group_id].loop_check:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "该群已在监控中")
+
+    # 初始化监控
+    if group_id not in clanbattle_info:
+        clanbattle_info[group_id] = ClanBattle(group_id)
+    clan_info = clanbattle_info[group_id]
+
+    try:
+        client = await query(account, True)
+        await clan_info.init(client, user_id, None)
+    except Exception as e:
+        log.error(traceback.format_exc())
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"启动监控失败: {str(e)}"
+        )
+
+    loop_num = clan_info.loop_num
+    await clanbattle_pool.add_task(
+        PrioritizedQueryItem(data=ClanbattleItem(clan_info, loop_num))
+    )
+    return {
+        "message": "监控已启动",
+        "loop_num": loop_num,
+        "clan_name": clan_info.clan_name,
+        "rank": clan_info.rank,
+    }
 
 
 @app.get("/my_clans")
